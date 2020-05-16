@@ -1,4 +1,4 @@
-function get-WebPageTable{
+﻿function get-WebPageTable{
 param(
     [Parameter(Mandatory = $true)]
 
@@ -83,18 +83,28 @@ foreach($row in $rows)
 }
 
 }
-$allresponses = @()
-$number = 0
-while($number -lt 26)
-{
- $letter = [char](65 + $number)
- $searchUrl = "https://www.ffxiah.com/search/item?q=" + $letter
-$webResponse = Invoke-WebRequest -Uri $searchUrl
-$allresponses += $webResponse
-$number ++
-}
 
-foreach($response in $allresponses)
+$allresults
+$firstnumber = 1
+while($firstnumber -lt 26)
 {
-get-WebPageTable -WebRequest $response -TableNumber 3
+    $secondnumber = 1
+    while($secondnumber -lt 26)
+    {
+        $Uri = "https://www.ffxiah.com/search/item?q=" + [char](65 + $firstnumber) + [char](65 + $secondnumber)
+    
+        $R = Invoke-WebRequest -Uri $Uri -Body $form -Method Post
+        $Form = $R.Forms[1]
+        #Write-Host $form.Fields
+        $Form.Fields["sid"]=17
+        $Form.Fields["server"]="Siren"
+        $Form.Fields["name"]="Siren"
+        $Form.Fields["ffxi-main-server-select"]=17
+        $response = Invoke-WebRequest -Uri $Uri -Body $form.Fields -Method Post
+        $allresults += get-WebPageTable -WebRequest $response -TableNumber 3
+        $secondnumber++
+    }
+    $firstnumber ++
 }
+$allresults | sort "Item Name" -Unique | Export-Csv C:\temp\test.csv -NoTypeInformation
+
