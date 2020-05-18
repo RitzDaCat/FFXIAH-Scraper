@@ -1,0 +1,104 @@
+function get-WebTable{
+
+param(
+    [Parameter(Mandatory = $true)]
+
+    [Microsoft.PowerShell.Commands.HtmlWebResponseObject] $WebRequest,
+
+   
+
+    [Parameter(Mandatory = $true)]
+
+    [int] $TableNumber
+
+)
+
+## Extract the tables out of the web request
+
+$tables = @($WebRequest.ParsedHtml.getElementsByTagName("TABLE"))
+
+$table = $tables[$TableNumber]
+
+$titles = @()
+
+$rows = @($table.Rows)
+
+## Go through all of the rows in the table
+
+foreach($row in $rows)
+
+{
+
+    $cells = @($row.Cells)
+
+   
+
+    ## If we've found a table header, remember its titles
+
+    if($cells[0].tagName -eq "TH")
+
+    {
+
+        $titles = @($cells | % { ("" + $_.InnerText).Trim() })
+
+        continue
+
+    }
+
+    ## If we haven't found any table headers, make up names "P1", "P2", etc.
+
+    if(-not $titles)
+
+    {
+
+        $titles = @(1..($cells.Count + 2) | % { "P$_" })
+
+    }
+
+    ## Now go through the cells in the the row. For each, try to find the
+
+    ## title that represents that column and create a hashtable mapping those
+
+    ## titles to content
+
+    $resultObject = [Ordered] @{}
+
+    for($counter = 0; $counter -lt $cells.Count; $counter++)
+
+    {
+
+        $title = $titles[$counter]
+
+        if(-not $title) { continue }
+
+       
+
+        $resultObject[$title] = ("" + $cells[$counter].InnerText).Trim()
+
+    }
+
+    ## And finally cast that hashtable to a PSCustomObject
+
+    [PSCustomObject] $resultObject
+
+}
+
+}
+
+#Get ID!
+$URI = "https://www.ffxiah.com/item/2"
+$initialWebRequest = Invoke-WebRequest -Uri $URI -MaximumRedirection 0 -ErrorAction Ignore
+$ID = ($initialWebRequest.Headers.Location).Split("/")
+$ID = $ID[2]
+Write-Host "THE ID: $ID"
+$secondWebRequest = Invoke-WebRequest -Uri $URI
+$Title = $secondWebRequest.ParsedHtml.title.Split("-")
+$Title = $Title[0]
+Write-Host "Title: $Title"
+
+$results = get-WebTable -WebRequest $secondWebRequest -TableNumber 2
+write-host $results[4].P1 $results[4].P2
+write-host $results[5].P1 $results[5].P2
+write-host $results[6].P1 $results[6].p2
+
+
