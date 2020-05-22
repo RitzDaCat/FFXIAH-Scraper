@@ -1,0 +1,8 @@
+PS C:\Users\preitz> $s.Headers.Location
+PS C:\Users\preitz> $s = Invoke-WebRequest -Uri google.com -MaximumRedirection 0 -ErrorAction ignore
+PS C:\Users\preitz> $s.Headers.Location
+http://www.google.com/
+PS C:\Users\preitz> $s = Invoke-WebRequest -Uri https://www.ffxiah.com/item/22298 -MaximumRedirection 0 -ErrorAction ignore
+PS C:\Users\preitz> $s.Headers.Location
+/item/22298/aurgelmir-orb-1
+PS C:\Users\preitz>
