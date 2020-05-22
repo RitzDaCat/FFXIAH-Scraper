@@ -8,6 +8,14 @@ If (-not (Get-Module -ErrorAction Ignore -ListAvailable PowerHTML)) {
 Import-Module -ErrorAction Stop PowerHTML
 # Parse the HTML file into an HTML DOM.
 
+#start using parallel function?
+$FromIndex = 0      # Arrays start at 0
+$ToIndex = 1499    # Our initial batch goes to index 1499
+$Increment = 1500   # We increment each batch by 1500 items
+$End = $false       # Bool for whether we're at the end of the FilesToProcess array
+$LastItemIndex = 30000 # The index of the last item in the array
+
+
 $global:emptyCSV = @()
 function ProcessData([int]$FromIndex, [int]$ToIndex)
 {
@@ -52,8 +60,13 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
             if($item3.XPath.Contains("/tr[7]/td[2]"))
             {
                 $PRICE = $item3.InnerText
+                if(!($PRICE-match '^[0-9]+$'))
+                {
+                    $PRICE = 0
+                }
             }
         }
+
         foreach ($item4 in $node.SelectNodes("//span[@class='" + "item-name" + "']"))
         {
             $NAME = $item4.InnerText.Trim().Replace("&nbsp;","").TrimEnd()
@@ -103,12 +116,7 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
     return $results
 }@($output) #added this
 
-#start using parallel function?
-$FromIndex = 0      # Arrays start at 0
-$ToIndex = 1499    # Our initial batch goes to index 1499
-$Increment = 1500   # We increment each batch by 1500 items
-$End = $false       # Bool for whether we're at the end of the FilesToProcess array
-$LastItemIndex = 30000 # The index of the last item in the array
+
 
 do {
     
@@ -132,4 +140,5 @@ do {
 } while ($End -ne $true)
 $endTime = Get-Date
 Write-Host $endTime
+$emptyCSV | Export-Csv -Path "C:\Repos\FFXIAH-Scraper\data5.csv"
 $emptyCSV | Out-GridView -Title "FFXIAH ITEMS"
