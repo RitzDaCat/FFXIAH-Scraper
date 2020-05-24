@@ -8,12 +8,50 @@ If (-not (Get-Module -ErrorAction Ignore -ListAvailable PowerHTML)) {
 Import-Module -ErrorAction Stop PowerHTML
 # Parse the HTML file into an HTML DOM.
 
-#start using parallel function?
-$FromIndex = 0      # Arrays start at 0
-$ToIndex = 1499    # Our initial batch goes to index 1499
+#VARIABLES
+$outputPath = "C:\Repos\FFXIAH-Scraper\items.csv"
+$sid = 28 
+<#
+            <option value="28">Asura</option>
+            <option value="1">Bahamut</option>
+            <option value="25">Bismarck</option>
+            <option value="6">Carbuncle</option>
+            <option value="23">Cerberus</option>
+            <option value="7">Fenrir</option>
+            <option value="27">Lakshmi</option>
+            <option value="11">Leviathan</option>
+            <option value="12">Odin</option>
+            <option value="5">Phoenix</option>
+            <option value="16">Quetzalcoatl</option>
+            <option value="20">Ragnarok</option>
+            <option value="2">Shiva</option>
+            <option value="17">Siren</option>
+            <option value="8">Sylph</option>
+            <option value="9">Valefor</option>
+            <optgroup label="Inactive">
+                <option value="10">Alexander</option>
+                <option value="15">Caitsith</option>
+                <option value="14">Diabolos</option>
+                <option value="30">Fairy</option>
+                <option value="22">Garuda</option>
+                <option value="19">Gilgamesh</option>
+                <option value="32">Hades</option>
+                <option value="13">Ifrit</option>
+                <option value="24">Kujata</option>
+                <option value="29">Midgardsormr</option>
+                <option value="21">Pandemonium</option>
+                <option value="4">Ramuh</option>
+                <option value="31">Remora</option>
+                <option value="26">Seraph</option>
+                <option value="3">Titan</option>
+                <option value="18">Unicorn</option>
+#>
+#PARALLEL CONFIG
+$FromIndex = 1      # Arrays start at 0
+$ToIndex = 500    # Our initial batch goes to index 1499
 $Increment = 1500   # We increment each batch by 1500 items
 $End = $false       # Bool for whether we're at the end of the FilesToProcess array
-$LastItemIndex = 30000 # The index of the last item in the array
+$LastItemIndex = 500 # The index of the last item in the array
 
 
 $global:emptyCSV = @()
@@ -21,9 +59,17 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
 {
     $results = $FromIndex..$ToIndex | ForEach-Object -Parallel{
     try{
-    $number = $_
-    $URI = "https://www.ffxiah.com/item/" + $number
-    $htmlDom = ConvertFrom-Html -URI $URI
+        $number = $_
+        $Uri = "https://www.ffxiah.com/item/"+$number 
+        $Body = @{
+            sid = $sid
+        }
+        $properRequest = Invoke-WebRequest -Method HEAD -Uri $Uri
+        #write-host $properRequest.BaseResponse.RequestMessage.RequestUri.AbsolutePath
+        $newURL = "https://www.ffxiah.com" + $properRequest.BaseResponse.RequestMessage.RequestUri.AbsolutePath
+        $response = Invoke-WebRequest -Uri $newURL -Form $Body -Method Post 
+    #$htmlDom = ConvertFrom-Html -URI $URI
+    $htmlDom = ConvertFrom-Html -Content $response.Content
     $node = $htmlDom.SelectSingleNode("//body")
     # Find a specific table by its column names, using an XPath
     # query to iterate over all tables.""
@@ -47,6 +93,11 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
             if($SOLDDAY -eq "")
             {
                 $SOLDDAY = 0
+            }
+            if($SOLDDAY -gt 1)
+            {
+                #weird error from pydarkstar?
+                $SOLDDAY = 1
             }
         }
         <#
@@ -80,18 +131,24 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
         Write-Host "NAME:" $NAME
         #>
     }
-    if(!($PRICE -eq 0))
+    if(!($PRICE -eq 0) -and !($null -eq $ID))
     {
         $itemData = @(
 
         [pscustomobject]@{
 
-        ID = $ID
-        NAME = $NAME
-        PRICE = $PRICE
-        STOCK  = $STOCK
-        SPD = $SOLDDAY
-
+        itemid = $ID
+        name = $NAME
+        sell01 = 1
+        buy01 = 1
+        price01 = $PRICE
+        stock01  = $STOCK
+        rate01 = $SOLDDAY
+        sell12 = 0
+        buy12 = 1
+        price12 = 1
+        stock12 = 5
+        rate12 = $SOLDDAY
         }
         )
         $output = $itemData
@@ -109,7 +166,9 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
     catch{
         $output = $_
     }
+    
     @($output)
+
 
     } -ThrottleLimit 8
 
@@ -140,5 +199,6 @@ do {
 } while ($End -ne $true)
 $endTime = Get-Date
 Write-Host $endTime
-$emptyCSV | Export-Csv -Path "C:\Repos\FFXIAH-Scraper\data5.csv"
-$emptyCSV | Out-GridView -Title "FFXIAH ITEMS"
+$emptyCSV | Select-Object itemid,name,sell01,buy01,price01,stock01,rate01,sell12,buy12,price122,stock12,rate12 -Unique | Where-Object itemid | Export-Csv -Path $outputPath -Force
+$emptyCSV | Select-Object itemid,name,sell01,buy01,price01,stock01,rate01,sell12,buy12,price122,stock12,rate12 -Unique | Where-Object itemid | Out-GridView -Title "Prices on Asura"
+#$emptycsv | Select-Object * | ConvertTo-Csv | % {$_ -replace '"', ""} | Out-File $outputpath
