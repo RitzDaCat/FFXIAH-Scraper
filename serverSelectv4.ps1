@@ -8,9 +8,9 @@ If (-not (Get-Module -ErrorAction Ignore -ListAvailable PowerHTML)) {
 Import-Module -ErrorAction Stop PowerHTML
 # Parse the HTML file into an HTML DOM.
 
-#VARIABLES
+#OUTSIDE VARIABLES
 $outputPath = "C:\Repos\FFXIAH-Scraper\items.csv"
-$sid = 28 
+#change line 61 to change servers
 <#
             <option value="28">Asura</option>
             <option value="1">Bahamut</option>
@@ -48,24 +48,26 @@ $sid = 28
 #>
 #PARALLEL CONFIG
 $FromIndex = 1      # Arrays start at 0
-$ToIndex = 500    # Our initial batch goes to index 1499
-$Increment = 1500   # We increment each batch by 1500 items
+$ToIndex = 1499  # Our initial batch goes to index 1499
+$Increment = 1500  # We increment each batch by 1500 items
 $End = $false       # Bool for whether we're at the end of the FilesToProcess array
-$LastItemIndex = 500 # The index of the last item in the array
+$LastItemIndex = 29500 # The index of the last item in the array
 
 
 $global:emptyCSV = @()
 function ProcessData([int]$FromIndex, [int]$ToIndex)
 {
+    #inside parallel variables
     $results = $FromIndex..$ToIndex | ForEach-Object -Parallel{
     try{
         $number = $_
         $Uri = "https://www.ffxiah.com/item/"+$number 
         $Body = @{
-            sid = $sid
+            sid = 28
         }
         $properRequest = Invoke-WebRequest -Method HEAD -Uri $Uri
         #write-host $properRequest.BaseResponse.RequestMessage.RequestUri.AbsolutePath
+        
         $newURL = "https://www.ffxiah.com" + $properRequest.BaseResponse.RequestMessage.RequestUri.AbsolutePath
         $response = Invoke-WebRequest -Uri $newURL -Form $Body -Method Post 
     #$htmlDom = ConvertFrom-Html -URI $URI
@@ -93,11 +95,6 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
             if($SOLDDAY -eq "")
             {
                 $SOLDDAY = 0
-            }
-            if($SOLDDAY -gt 1)
-            {
-                #weird error from pydarkstar?
-                $SOLDDAY = 1
             }
         }
         <#
@@ -139,20 +136,14 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
 
         itemid = $ID
         name = $NAME
-        sell01 = 1
-        buy01 = 1
         price01 = $PRICE
         stock01  = $STOCK
         rate01 = $SOLDDAY
-        sell12 = 0
-        buy12 = 1
-        price12 = 1
-        stock12 = 5
-        rate12 = $SOLDDAY
         }
         )
         $output = $itemData
-        $emptyCSV += $itemData
+        Remove-Variable itemData
+        #$emptyCSV += $itemData
     }
     <#
     if($_ % 500 -eq 0)
@@ -162,6 +153,10 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
         [system.gc]::Collect()
     }
     #>
+    Remove-Variable htmlDom 
+    Remove-Variable properRequest
+    Remove-Variable node
+    Remove-Variable response
     }
     catch{
         $output = $_
@@ -170,7 +165,7 @@ function ProcessData([int]$FromIndex, [int]$ToIndex)
     @($output)
 
 
-    } -ThrottleLimit 8
+    } -ThrottleLimit 6
 
     return $results
 }@($output) #added this
@@ -183,8 +178,8 @@ do {
     $results = ProcessData -FromIndex $FromIndex -ToIndex $ToIndex
     $emptyCSV+=$results
     Write-Host "[+] Running Garbage Collection" -ForegroundColor Red
-    [system.gc]::Collect() # Manual garbage collection following parallel processing of a batch
-
+    #[system.gc]::Collect() # Manual garbage collection following parallel processing of a batch
+    [System.GC]::GetTotalMemory($true) | out-null
     # We increment the FromIndex and ToIndex variables to set them for the next batch
     $FromIndex = $ToIndex + 1
     $ToIndex = $ToIndex + $Increment
@@ -199,6 +194,5 @@ do {
 } while ($End -ne $true)
 $endTime = Get-Date
 Write-Host $endTime
-$emptyCSV | Select-Object itemid,name,sell01,buy01,price01,stock01,rate01,sell12,buy12,price122,stock12,rate12 -Unique | Where-Object itemid | Export-Csv -Path $outputPath -Force
-$emptyCSV | Select-Object itemid,name,sell01,buy01,price01,stock01,rate01,sell12,buy12,price122,stock12,rate12 -Unique | Where-Object itemid | Out-GridView -Title "Prices on Asura"
+$emptyCSV | Select-Object itemid,name,price01,stock01 -Unique | Where-Object itemid | Export-Csv -Path $outputPath -Force
 #$emptycsv | Select-Object * | ConvertTo-Csv | % {$_ -replace '"', ""} | Out-File $outputpath
